@@ -16,7 +16,7 @@ timeexport = time.strftime("%Y%m%d_")
 def MS(TEC):
   inicio = timeit.default_timer()
   this_function_name = inspect.currentframe().f_code.co_name
-  print(this_function_name, ' Processing...')
+  print(this_function_name, f'{TEC} Processing...')
   pathToImport = script_dir + '/import/'+TEC
   pathToSave = script_dir + '/export/'+this_function_name +'/'
   if not os.path.exists(pathToSave):
@@ -73,7 +73,15 @@ def tratarArchive(Frame):
   Frame['YearWeek'] =  + Frame['YearWeek'].str[-4:] + Frame['YearWeek'].str[:3]    
   Frame.sort_values(by=['YearWeek','RAN Node','Celula'], ascending=True,inplace=True)
   LastDate = Frame['YearWeek'].max()
-  print(LastDate)
+  
+  #Normalização Volume:
+  kb_gb = 1024*1024
+  mb_gb = 1024
+  CoversionVolume = {'2G':kb_gb,'3G':mb_gb,'4G':1,'5G':1}
+  for key, value in CoversionVolume.items():
+    Frame.loc[Frame['TEC'] == key,['VOLUME']] = (Frame['VOLUME']/value).round(2)
+
+
   Frame['ref'] = Frame['RAN Node'].astype(str) + Frame['CELL'].astype(str) + Frame['YearWeek'].astype(str)
   Frame['ref2'] = Frame['RAN Node'].astype(str) + Frame['CELL'].astype(str)
   FrameSUM = Frame.groupby(['ref']).agg({'VOLUME':'sum','TRAFEGO':'sum','DISP':'mean'}).round(2).reset_index()#mean, median
@@ -116,17 +124,8 @@ def tratarArchive(Frame):
 
 
 
-  '''
  
-  #Por enquanto sem normalização dos dados
   
-  CoversionVolume = {'2G':2048,'3G':1024,'4G':1,'5G':1}
-  
-  for key, value in CoversionVolume.items():
-    Frame.loc[Frame['TEC'] == key,['Volume3']] = (Frame['Volume2']/value).round(2)
-  
-  #print(Frame.loc[~Frame['VERIFCAR'].isna()])
-  '''
   return Frame
 
 
@@ -147,8 +146,8 @@ cols_to_convert = ['DISP','VOLUME','TRAFEGO','VOLUME(sum)','TRAFEGO(sum)','DISP(
 for col in cols_to_convert:
     MERGE[col] = MERGE[col].astype(float)
 print(MERGE.dtypes)
-MERGE.to_csv(pathToSave +'.csv',index=False,header=True,sep=';',decimal=',') #decimal to works need type as number
 
+MERGE.to_csv(pathToSave +'.csv',index=False,header=True,sep=';',decimal=',') #decimal to works need type as number
 
 comparePMO = MERGE.loc[(~MERGE['VERIFICAR'].isna())&(MERGE['DropAnalise'].isna())&(MERGE['TEC'] !='2G')&(MERGE['RAN Node'].str[-3:-2] != '_')]
 KeepListCompared = ['Regional','ANF','Municipio','IBGE','Classificacao','YearWeek','Station ID','RAN Node','TEC','ref2','VOLUME(sum)','TRAFEGO(sum)','DISP(mean)','VOLUME(median)','TRAFEGO(median)','DISP(median)','VOLUME%','TRAFEGO%','VERIFICAR']
@@ -157,8 +156,27 @@ DellListComparede = list(set(locationBase_comparePMO)^set(KeepListCompared))
 comparePMO = comparePMO.drop(DellListComparede,1)
 comparePMO = comparePMO.drop_duplicates()
 comparePMO = comparePMO.reset_index(drop=True)
+
+#VOLUME(median)
+#TRAFEGO(median)
+
+comparePMO.sort_values(by=['VOLUME(median)','TRAFEGO(median)'], ascending=[False,False],inplace=True)
+
 comparePMO.to_csv(pathToSave +'_Consolidated.csv',index=False,header=True,sep=';',decimal=',') #decimal to works need type as number
 
 
+'''
+REGRAS
+Premissas adotadas:
+•	Agregação por setor físico: KPIs de Volume e Trafego são somados por W, considerando o setor físico 1,2 ou 3 eventualmente 4. [ Colunas VOLUME(sum)|TRAFEGO(sum)]
+•	Mediana das últimas Ws: Após a agregação dos valores e feita a mediana das últimas W descartando a W atual. [Colunas VOLUME(median)| TRAFEGO(median)]
+•	Delta da última W: Considerando as medianas e realizado o DELTA da última W. [Colunas VOLUME%|TRAFEGO%]
+•	VERIFICAR: Consolidado das análises respeitando os thresholds abaixo:
+o	Variação >= 60%
+o	Disp >= 98,00% Disponibilidade média do setor físico na última W acima de 98%
+o	DropAnalise= FALSE (Excluído os casos 5G 700 na ANF 11 e sites 2G)
+o Excluir Sites VIVO _SP
+o Ranking por Volume e trafego
+'''
 
 
