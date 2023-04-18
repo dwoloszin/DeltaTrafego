@@ -74,6 +74,16 @@ def tratarArchive(Frame):
   Frame.sort_values(by=['YearWeek','RAN Node','Celula'], ascending=True,inplace=True)
   LastDate = Frame['YearWeek'].max()
   print(LastDate)
+
+
+  #Normalização Volume:
+  kb_gb = 1024*1024
+  mb_gb = 1024
+  CoversionVolume = {'2G':kb_gb,'3G':mb_gb,'4G':1,'5G':1}
+  for key, value in CoversionVolume.items():
+    Frame.loc[Frame['TEC'] == key,['VOLUME']] = (Frame['VOLUME']/value).round(2)
+
+
   Frame['ref'] = Frame['RAN Node'].astype(str) + Frame['CELL'].astype(str) + Frame['YearWeek'].astype(str)
   Frame['ref2'] = Frame['RAN Node'].astype(str) + Frame['CELL'].astype(str)
   FrameSUM = Frame.groupby(['ref']).agg({'VOLUME':'sum','TRAFEGO':'sum','DISP':'mean'}).round(2).reset_index()#mean, median
@@ -116,17 +126,8 @@ def tratarArchive(Frame):
 
 
 
-  '''
  
-  #Por enquanto sem normalização dos dados
   
-  CoversionVolume = {'2G':2048,'3G':1024,'4G':1,'5G':1}
-  
-  for key, value in CoversionVolume.items():
-    Frame.loc[Frame['TEC'] == key,['Volume3']] = (Frame['Volume2']/value).round(2)
-  
-  #print(Frame.loc[~Frame['VERIFCAR'].isna()])
-  '''
   return Frame
 
 
@@ -147,8 +148,8 @@ cols_to_convert = ['DISP','VOLUME','TRAFEGO','VOLUME(sum)','TRAFEGO(sum)','DISP(
 for col in cols_to_convert:
     MERGE[col] = MERGE[col].astype(float)
 print(MERGE.dtypes)
-MERGE.to_csv(pathToSave +'.csv',index=False,header=True,sep=';',decimal=',') #decimal to works need type as number
 
+MERGE.to_csv(pathToSave +'.csv',index=False,header=True,sep=';',decimal=',') #decimal to works need type as number
 
 comparePMO = MERGE.loc[(~MERGE['VERIFICAR'].isna())&(MERGE['DropAnalise'].isna())&(MERGE['TEC'] !='2G')&(MERGE['RAN Node'].str[-3:-2] != '_')]
 KeepListCompared = ['Regional','ANF','Municipio','IBGE','Classificacao','YearWeek','Station ID','RAN Node','TEC','ref2','VOLUME(sum)','TRAFEGO(sum)','DISP(mean)','VOLUME(median)','TRAFEGO(median)','DISP(median)','VOLUME%','TRAFEGO%','VERIFICAR']
@@ -157,6 +158,7 @@ DellListComparede = list(set(locationBase_comparePMO)^set(KeepListCompared))
 comparePMO = comparePMO.drop(DellListComparede,1)
 comparePMO = comparePMO.drop_duplicates()
 comparePMO = comparePMO.reset_index(drop=True)
+
 comparePMO.to_csv(pathToSave +'_Consolidated.csv',index=False,header=True,sep=';',decimal=',') #decimal to works need type as number
 
 
